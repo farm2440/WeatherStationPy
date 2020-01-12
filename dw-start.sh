@@ -1,5 +1,12 @@
 #!/bin/bash
 
+# Note by Svilen: This script is modified from the original dw-start.sh.
+# Lines 41, 49 and 129 are changed. If direwolf not started as root, run
+# sudo ldconfig command
+# Start the script with command
+# crontab -e and appending to the end of file:
+# * * * * * /home/pi/dw-start.sh >/dev/null 2>&1
+
 # Run this from crontab periodically to start up
 # Dire Wolf automatically.
 
@@ -17,7 +24,7 @@
 # v1.0 - WB2OSZ - original version for Xwindow displays only
 
 
-
+PATH=$PATH:/usr/local/lib/
 #How are you running Direwolf : within a GUI (Xwindows / VNC) or CLI mode
 #
 #  AUTO mode is design to try starting direwolf with GUI support and then
@@ -34,8 +41,8 @@ RUNMODE=AUTO
 # Location of the direwolf binary.  Depends on $PATH as shown.
 # change this if you want to use some other specific location.
 # e.g.  DIREWOLF="/usr/local/bin/direwolf"
-DIREWOLF="/usr/local/bin/direwolf"
 
+DIREWOLF="/usr/local/bin/direwolf"
 
 #Direwolf start up command :: two examples where example one is enabled
 #
@@ -43,8 +50,8 @@ DIREWOLF="/usr/local/bin/direwolf"
 #    Print audio statistics each 100 seconds for troubleshooting.
 #    Change this command to however you wish to start Direwolf
 
-#DWCMD="$DIREWOLF -a 100"
 DWCMD="bash -l -c '$DIREWOLF -c /home/pi/direwolf.conf'"
+
 #---------------------------------------------------------------
 #
 # 2. Alternative for running with SDR receiver.
@@ -121,7 +128,6 @@ function GUI {
    #
 
    if [ -x /usr/bin/lxterminal ]; then
-      # /usr/bin/lxterminal -t "Dire Wolf" -e "$DWCMD" &
       /usr/bin/lxterminal -l -t "Dire Wolf" -e "$DWCMD" &
       SUCCESS=1
      elif [ -x /usr/bin/xterm ]; then

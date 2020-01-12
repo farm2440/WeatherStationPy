@@ -16,8 +16,8 @@ ptt.off()
 # Data from dicts is sent periodically and after this dictionaries are cleared.
 aprs_data = {}
 mqtt_data = {}
-aprs_tx_period = datetime.timedelta(minutes=10)
-mqtt_tx_period = datetime.timedelta(minutes=15)
+aprs_tx_period = datetime.timedelta(minutes=5, seconds=10)
+mqtt_tx_period = datetime.timedelta(minutes=5, seconds=15)
 aprs_last_tx_timestamp = datetime.datetime.now()
 mqtt_last_tx_timestamp = datetime.datetime.now()
 
@@ -102,6 +102,7 @@ def aprs(aprs_data_string):
     # Direwolf shall be started on on power on. This function connects to Direwolf (software TNC) on port 8001.
 
     print("Sending APRS:", aprs_data_string)
+    print
     # msg_body = '!4323.28H/02789.64E>TEST'
     # msg_body = '!4313.98NW02753.78E# TEST 6'
     # msg_body = '!4313.98N/02753.78Ey c999s999g008t054r001 TEST 20'
@@ -126,6 +127,7 @@ def aprs(aprs_data_string):
             # Last address
             ssid += 1
         msg += chr(ssid)
+
     msg += chr(0x03)
     msg += chr(0xF0)
     msg += msg_header
@@ -142,7 +144,7 @@ def aprs(aprs_data_string):
         time.sleep(2)
         ptt.off()
     except socket_error as err:
-        print("ERR: Failed APRS transmission! Check that Direwolf is running.")
+        print("ERR: Failed APRS trasmission! Check that Direwolf is running.")
         print err
         print
 
@@ -293,7 +295,7 @@ while 1:
             client.disconnect()
             mqtt_data.clear()
             mqtt_last_tx_timestamp = timestamp
-
+            print
         except socket_error as err:
             print("ERR: Failed publish data to broker")
             print err
@@ -307,6 +309,6 @@ while 1:
         for aprs_data_key in aprs_data:
             if aprs_data_key in aprs_var_name_translation.keys():
                 aprs_message += aprs_var_name_translation[aprs_data_key]
-                aprs_message += aprs_data[aprs_data_key]
+                aprs_message += str(aprs_data[aprs_data_key])
         aprs_data.clear()
         aprs(aprs_message)
