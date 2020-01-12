@@ -1,14 +1,14 @@
 #!/usr/bin/env python
 from socket import *
-# from gpiozero import LED  TODO
+from gpiozero import LED
 import datetime
 import time
 import re
 import paho.mqtt.client as mqtt
 from socket import error as socket_error
 
-# ptt = LED(4)
-# ptt.off()   TODO
+ptt = LED(4)
+ptt.off()
 
 # Every time when broadcast message is received from a sensor the data from it is parsed and stored to aprs_data and
 # mqtt_data dictionaries. Tke keys are var names in format <mac address>_<data type>. Values are the value measured by
@@ -16,8 +16,8 @@ from socket import error as socket_error
 # Data from dicts is sent periodically and after this dictionaries are cleared.
 aprs_data = {}
 mqtt_data = {}
-aprs_tx_period = datetime.timedelta(minutes=2)
-mqtt_tx_period = datetime.timedelta(minutes=2)
+aprs_tx_period = datetime.timedelta(minutes=10)
+mqtt_tx_period = datetime.timedelta(minutes=15)
 aprs_last_tx_timestamp = datetime.datetime.now()
 mqtt_last_tx_timestamp = datetime.datetime.now()
 
@@ -69,7 +69,7 @@ rain_data_24h = {}
 mcast_port = 8888
 mcast_grp = "224.0.0.120"
 # interface_ip = str(INADDR_ANY)         # Sensors obtain their IP by DHCP starting from 192.168.152.100
-interface_ip = str("192.168.152.91")    # RaspberryPi board has fixed IP address in LAN
+interface_ip = str("192.168.152.90")    # RaspberryPi board has fixed IP address in LAN
 
 s = socket(AF_INET, SOCK_DGRAM)
 s.bind(("", mcast_port))
@@ -79,8 +79,9 @@ s.setsockopt(IPPROTO_IP, IP_ADD_MEMBERSHIP, str(mreq))
 # prepare MQTT broker connection
 # https://customer.cloudmqtt.com/login
 # https://1sheeld.com/mqtt-protocol/
-client = mqtt.Client(client_id='*************') 
-client.username_pw_set('******', '*********')
+client = mqtt.Client(client_id='farmer.cloudmqtt.com')
+client.username_pw_set('mkqkhspd', 'UkcNeTyV78hB')
+
 
 
 def on_connect(client, userdata, flags, rc):
@@ -98,14 +99,9 @@ client.on_connect = on_connect
 def aprs(aprs_data_string):
     # This function takes a string which should contain sensors data and transmit, adds APRS header including
     # APRS symbol, GPS coordinates and transmits it over radio. PTT is triggered by GPIO  .
-    # Direwolf shall be started on on power on. This function connects to Direwolf on port 8001.
+    # Direwolf shall be started on on power on. This function connects to Direwolf (software TNC) on port 8001.
 
     print("Sending APRS:", aprs_data_string)
-    return 0
-
-    soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    soc.connect(('127.0.0.1', 8001))
-
     # msg_body = '!4323.28H/02789.64E>TEST'
     # msg_body = '!4313.98NW02753.78E# TEST 6'
     # msg_body = '!4313.98N/02753.78Ey c999s999g008t054r001 TEST 20'
@@ -116,10 +112,7 @@ def aprs(aprs_data_string):
     callsigns = ['LZ2SMX9 ', 'LZ2SMX3', 'WIDE2 1']
     # msg_header = '!4313.98N/02753.78Ey '  # vazrajdane 66, house with Yagi
     msg_header = '!4307.46N/02744.14Ey '  # Zdravets, house with Yagi
-
-    # msg_body = 'T_garage=15 T_fl.2=23 Tfl.1=18 P=1008hPa   TEST 11'
     msg_body = aprs_data_string
-
     msg = chr(0xC0)
     msg += chr(0x00)
     for i in range(0, len(callsigns)):
@@ -133,19 +126,26 @@ def aprs(aprs_data_string):
             # Last address
             ssid += 1
         msg += chr(ssid)
-
     msg += chr(0x03)
     msg += chr(0xF0)
     msg += msg_header
     msg += msg_body
     msg += chr(0xC0)
 
-    print('Sending APRS data:', msg_body)
-#    ptt.on()
-    time.sleep(0.1)
-    soc.send(msg)
-    time.sleep(2)
-#    ptt.off() TODO
+    try:
+        soc = socket(AF_INET, SOCK_STREAM)
+        soc.connect(('127.0.0.1', 8001))
+
+        ptt.on()
+        time.sleep(0.1)
+        soc.send(msg)
+        time.sleep(2)
+        ptt.off()
+    except socket_error as err:
+        print("ERR: Failed APRS transmission! Check that Direwolf is running.")
+        print err
+        print
+
     return 0
 
 
