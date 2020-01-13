@@ -18,6 +18,19 @@ done
 echo "ppp is present!" >> log2
 echo "ppp is present!"
 
-#runuser -l pi -c '/home/pi/direwolf/direwolf &'
+# wait for WiFi network is connected. SSID here is Etherino and should be correctly updated
+RESULT=1
+until [ $RESULT -eq 0 ]
+do
+    sleep 5
+    TEST=$(iwconfig wlan0 | grep Etherino)
+    RESULT=$?
+    echo "no Etherino WiFi network..." >> /home/pi/log2
+    echo "no Etherino WiFi network..."
+done
+echo "Connected to WiFi SSID=Etherinp!" >> log2
+echo "Connectes to WiFi SSID=Etherino!"
+
+
 runuser -l pi -c 'python /home/pi/weather.py &'
 
