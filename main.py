@@ -1,4 +1,12 @@
 #!/usr/bin/env python
+
+# Description : A Python code for weather station based on Raspberry Pi.
+# Collected data from sensors by multicast packet is sent to MQTT broker over Internet
+# and by radio to APRS Ham radio network.
+# Author : Svilen Stavrev
+# Date : 18.01.2020
+
+
 from socket import *
 from gpiozero import LED
 import datetime
@@ -79,8 +87,8 @@ s.setsockopt(IPPROTO_IP, IP_ADD_MEMBERSHIP, str(mreq))
 # prepare MQTT broker connection
 # https://customer.cloudmqtt.com/login
 # https://1sheeld.com/mqtt-protocol/
-client = mqtt.Client(client_id='farmer.cloudmqtt.com')
-client.username_pw_set('mkqkhspd', 'UkcNeTyV78hB')
+client = mqtt.Client(client_id='***************')
+client.username_pw_set('*********', '***********')
 
 
 
