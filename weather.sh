@@ -10,7 +10,7 @@ RESULT=1
 until [ $RESULT -eq 0 ]
 do
     sleep 5
-    USBDEVICES=$(ifconfig | grep 'ppp')
+    INTERFACE=$(ifconfig | grep 'ppp')
     RESULT=$?
     echo "no ppp..." >> /home/pi/log2
     echo "no ppp..."

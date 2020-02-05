@@ -1,12 +1,4 @@
 #!/usr/bin/env python
-
-# Description : A Python code for weather station based on Raspberry Pi.
-# Collected data from sensors by multicast packet is sent to MQTT broker over Internet
-# and by radio to APRS Ham radio network.
-# Author : Svilen Stavrev
-# Date : 18.01.2020
-
-
 from socket import *
 from gpiozero import LED
 import datetime
@@ -24,19 +16,21 @@ ptt.off()
 # Data from dicts is sent periodically and after this dictionaries are cleared.
 aprs_data = {}
 mqtt_data = {}
-aprs_tx_period = datetime.timedelta(minutes=5, seconds=10)
-mqtt_tx_period = datetime.timedelta(minutes=5, seconds=15)
+aprs_tx_period = datetime.timedelta(minutes=10, seconds=19)
+mqtt_tx_period = datetime.timedelta(minutes=5)
 aprs_last_tx_timestamp = datetime.datetime.now()
 mqtt_last_tx_timestamp = datetime.datetime.now()
 
+mac_outside_sensor = '77:b7:bf'
+
 aprs_var_name_translation = {
-    '1d:aa:44_temp': ' T1=',  # Garage
+    '1d:aa:44_temp': ' Tg=',  # Garage
     '1d:ab:43_temp': ' T2=',  # Fl.2
-    '1d:a7:d1_temp': ' T3=',  # Fl.1
+    '1d:a7:d1_temp': ' T1=',  # Fl.1
     '77:b7:bf_P': ' P=',  # Atm. pressure
     '77:b7:bf_temp': ' Tout=',  # Temperature outside
     '77:b7:bf_hum': ' Rh=',  # Humidity outside
-    '77:b7:bf_tempBMP': ' Tin',  # Temperature inside, measured on sensor board
+    '77:b7:bf_tempBMP': ' Tin=',  # Temperature inside, measured on sensor board
     '77:b7:bf_wd': ' WD=',  # Wind direction
     '77:b7:bf_ws': ' WS=',  # Wind speed
     '77:b7:bf_wg': ' WG=',  # Wind gusts
@@ -44,6 +38,7 @@ aprs_var_name_translation = {
     '77:b7:bf_rain24h': ' R24=',  # Rain for the last 24 hours
     '77:b7:bf_Ubat': ' U='    # Battery voltage
 }
+
 
 # TX20 wind sensors sends a number from 0 to 15 for wind direction. Here is conversion to string name
 wind_dir_dictionary = {
@@ -73,6 +68,9 @@ wind_dir_samples = []
 rain_data_1h = {}
 rain_data_24h = {}
 
+# atmospheric pressure altitude adjustment 12hPa for 100 meter
+ALTITUDE_ADJUST = 2 * 12
+
 # prepare for multicast receive
 mcast_port = 8888
 mcast_grp = "224.0.0.120"
@@ -87,9 +85,26 @@ s.setsockopt(IPPROTO_IP, IP_ADD_MEMBERSHIP, str(mreq))
 # prepare MQTT broker connection
 # https://customer.cloudmqtt.com/login
 # https://1sheeld.com/mqtt-protocol/
-client = mqtt.Client(client_id='***************')
-client.username_pw_set('*********', '***********')
+client = mqtt.Client(client_id='farmer.cloudmqtt.com')
+client.username_pw_set('*********', '********')
 
+# weather station APRS format . Check aprs_notes.txt file for details
+wx_data = [8]
+
+
+def clear_wx_data():
+    del wx_data[:]
+    wx_data.append('_...')       # 0 (_) wind direction in degrees
+    wx_data.append('/...')       # 1 (/) wind in mph. M/S * 2.237
+    wx_data.append('g...')       # 2 (g)
+    wx_data.append('t...')       # 3 (t) temperature in Farenheit. (1°C × 9/5) + 32 = 33.8°F
+    wx_data.append('r...')       # 4 (r) rain in last hour  (in hundreths of an inch) 1 mm to inch = 0.03937 inch
+    wx_data.append('p...')       # 5 (p)
+    wx_data.append('h..')        # 6 (h)
+    wx_data.append('b.....')     # 7 (b) The barometric pressure in tenths of millibars
+
+
+clear_wx_data()
 
 
 def on_connect(client, userdata, flags, rc):
@@ -159,7 +174,7 @@ def aprs(aprs_data_string):
     return 0
 
 
-# Receive multicast data and send it to MQTT broker  loop
+# Receive multicast data and send it to MQTT broker/APRS  loop
 while 1:
     # wait for multicast packet
     data, address = s.recvfrom(1024)
@@ -173,9 +188,13 @@ while 1:
     hum = -100
     wind_dir = -100
     wind_speed = -100
-    average_speed = 0
+    wind_speed_sum = 0
+    average_speed_ms = 0
+    average_speed_mph = 0
     average_dir = 0
-    gusts = 0
+    gusts_raw = 0
+    gusts_ms = 0
+    gusts_mph = 0
     tempBMP = -100
     pressure = -100
     ubat = -100
@@ -200,7 +219,7 @@ while 1:
                 # in wind_dir_samples[] and wind_speed_samples[]
                 if ln[-3:] != "ERR":
                     nums = re.findall(r'-?\d+', ln)
-                    wind_speed = int(nums[2])/10
+                    wind_speed = float(nums[2])
                     wind_dir = int(nums[1])
                     wind_dir_samples.append(wind_dir)
                     wind_speed_samples.append(wind_speed)
@@ -212,14 +231,17 @@ while 1:
 
                     for d in wind_dir_samples:
                         average_dir += d
-
                     average_dir = average_dir / len(wind_dir_samples)
-                    for spd in wind_speed_samples:
-                        average_speed += spd
-                        if spd > gusts:
-                            gusts = spd
 
-                    average_speed = average_speed / len(wind_speed_samples)
+                    for spd in wind_speed_samples:
+                        wind_speed_sum += spd
+                        if spd > gusts_raw:
+                            gusts_raw = spd
+
+                    average_speed_mph = int(wind_speed_sum * 0.2237 / len(wind_speed_samples))
+                    average_speed_ms = int(wind_speed_sum / (len(wind_speed_samples) * 10))
+                    gusts_ms = int(gusts_raw/10)
+                    gusts_mph = int(gusts_raw * 0.2237)
             if ln.startswith("BMP180:"):
                 nums = re.findall(r'-?\d+', ln)
                 tempBMP = nums[1]
@@ -252,16 +274,21 @@ while 1:
     else:
         continue    # Maybe malformed data
 
-    # store parsed data aprs_data and mqtt_data dictionaries
+    # store parsed data to wx_data, aprs_data and mqtt_data dictionaries
     if tempAM != -100:
         aprs_data[mac + '_' + 'temp'] = tempAM
         mqtt_data[mac + '_' + 'temp'] = tempAM
+        if mac == mac_outside_sensor:
+            wx_data[3] = 't%0*d' % (3, float(tempAM)*9/5+32)  # 3 (t) temperature in Farenheit. (1°C × 9/5) + 32 = 33.8°F
     if hum != -100:
         aprs_data[mac + '_' + 'hum'] = hum
         mqtt_data[mac + '_' + 'hum'] = hum
+        if mac == mac_outside_sensor:
+            wx_data[6] = 'h%0*d' % (2, hum)  # 6 (h)
     if pressure != -100:
-        aprs_data[mac + '_' + 'P'] = pressure
-        mqtt_data[mac + '_' + 'P'] = pressure
+        aprs_data[mac + '_' + 'P'] = pressure + ALTITUDE_ADJUST
+        mqtt_data[mac + '_' + 'P'] = pressure + ALTITUDE_ADJUST
+        wx_data[7] = 'b%0*d' % (5, (pressure + ALTITUDE_ADJUST) * 10)     # 7 (b) The barometric pressure in tenths of millibars
     if tempBMP != -100:
         aprs_data[mac + '_' + 'tempBMP'] = tempBMP
         mqtt_data[mac + '_' + 'tempBMP'] = tempBMP
@@ -276,20 +303,27 @@ while 1:
                 rain_1h += int(rain_data_1h[t])
         aprs_data[mac + '_' + 'rain1h'] = rain_1h
         mqtt_data[mac + '_' + 'rain1h'] = rain_1h
+        wx_data[4] = 'r%0*d' % (3, rain_1h)     # 4 (r) rain in last hour  (in hundreds of an inch)
+                                                # 1mm to inch=0.03937 inch
         rain_24h = 0
         if len(rain_data_24h) != 0:
             for t in rain_data_24h:
                 rain_24h += int(rain_data_24h[t])
         aprs_data[mac + '_' + 'rain24h'] = rain_24h
         mqtt_data[mac + '_' + 'rain24h'] = rain_24h
+        wx_data[5] = 'p%0*d' % (3, rain_24h)     # 5 (p) rain in last 24 hours  (in hundreths of an inch)
+                                                 # 1 mm to inch = 0.03937 inch
     # process wind data
     if wind_speed != -100:
-        aprs_data[mac + '_' + 'ws'] = average_speed
-        aprs_data[mac + '_' + 'wg'] = gusts
+        aprs_data[mac + '_' + 'ws'] = average_speed_ms
+        aprs_data[mac + '_' + 'wg'] = gusts_ms
         aprs_data[mac + '_' + 'wd'] = wind_dir_dictionary[average_dir]
-        mqtt_data[mac + '_' + 'ws'] = average_speed
-        mqtt_data[mac + '_' + 'wg'] = gusts
+        mqtt_data[mac + '_' + 'ws'] = average_speed_ms
+        mqtt_data[mac + '_' + 'wg'] = gusts_ms
         mqtt_data[mac + '_' + 'wd'] = wind_dir_dictionary[average_dir]
+        wx_data[0] = '_%0*d' % (3, average_dir * 22.5)     # 0 (_) wind direction in degrees
+        wx_data[1] = '/%0*d' % (3, average_speed_mph)  # 1 (/) wind in mph. M/S * 2.237
+        wx_data[2] = 'g%0*d' % (3, gusts_mph)  # 2 (g) wind gusts in mph. M/S * 2.237
 
     # check if its time to send to MQTT broker.
     timestamp = datetime.datetime.now()
@@ -311,12 +345,32 @@ while 1:
 
     # check if its time to transmit APRS over radio.
     timestamp = datetime.datetime.now()
-    aprs_message = ''
+    aprs_message = ''       # all data in one string in format <var>=<value>
+    aprs_wx_message = ''    # weather data in aprs weather station format
+    aprs_wx_comment = ''    # room temperatures are added as comment to weather data
     if (timestamp - aprs_last_tx_timestamp) > aprs_tx_period:
         aprs_last_tx_timestamp = timestamp
         for aprs_data_key in aprs_data:
             if aprs_data_key in aprs_var_name_translation.keys():
-                aprs_message += aprs_var_name_translation[aprs_data_key]
-                aprs_message += str(aprs_data[aprs_data_key])
+                # prepare aprs_wx_comment
+                aprs_message += aprs_var_name_translation[aprs_data_key]  # var name =
+                aprs_message += str(aprs_data[aprs_data_key]) # value
+                # prepare aprs_wx_message
+                if aprs_var_name_translation[aprs_data_key] == ' Tg=':  # Garage
+                    aprs_wx_comment += (' Tg=' + str(aprs_data[aprs_data_key]))
+                if aprs_var_name_translation[aprs_data_key] == ' T2=':   # Fl.2
+                    aprs_wx_comment += (' T2=' + str(aprs_data[aprs_data_key]))
+                if aprs_var_name_translation[aprs_data_key] == ' T1=':  # Fl.1
+                    aprs_wx_comment += (' T1=' + str(aprs_data[aprs_data_key]))
+                if aprs_var_name_translation[aprs_data_key] == ' U=':  # Battery voltage
+                    aprs_wx_comment += (' U=' + str(aprs_data[aprs_data_key]))
+        # prepare aprs_wx_message
+        for tag in wx_data:
+            aprs_wx_message += tag
+        aprs_wx_message += aprs_wx_message
+        clear_wx_data()
         aprs_data.clear()
+        # we can choose which format data to send
         aprs(aprs_message)
+        #aprs(aprs_wx_message)
+

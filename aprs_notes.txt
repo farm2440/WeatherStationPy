@@ -1,0 +1,65 @@
+https://weather.gladstonefamily.net/aprswxnet.html
+http://www.findu.com/aprswxnet.html
+
+APRS/CWOP weather 2020-01-26 07:36:13: show weather charts
+Temperature 5.0°C Humidity 58% Pressure 1020.2 mbar
+Wind 232° 1.8 m/s (Gusts 2.7 m/s)
+Rain 0.0 mm/1h 0.0 mm/24h 0.0 mm/since midnight
+.weewx-3.9.1-FineOffsetUSB
+
+2020-01-25 23:06:01 EET: FW5351>APRS,TCPXX*,qAX,CWOP-1:@252105z4333.02N/02750.05E_225/003g005t041r000p000P000b10198h44.weewx-3.9.1-FineOffsetUSB
+_225/003g005t041r000p000P000b10198h44.weewx-3.9.1-FineOffsetUSB
+
+_225 - посока на вятъра в градуси
+/003g005 - сила на вятъра и пориви  в mph  M/S * 2.237
+t041  - темп. по фаренхайт   (1°C × 9/5) + 32 = 33.8°F
+r000 - ДЪЖД ЗА ПОСЛЕДНИЯ ЧАС (in hundreths of an inch)
+p000 - Rain in the last 24 hours (in hundreths of an inch) 1 mm to inch = 0.03937 inch
+P000 - The rain since the local midnight (in hundreths of an inch) -- this can be omitted
+b1019 -
+h44
+
+
+1   2
+W	/	WX	National Weather Service
+    _   WX
+    y   House with Yagi
+
+1:Symbol Code (the character found after the longitude in the APRS packet)
+2:Symbol Table ID (the character found between the latitude and longitude in the APRS packet)
+
+=======================================================================
+
+2020-01-31 22:10:07 EET: SP3QYJ-5>APRS,TCPIP*,qAC,T2POLAND:@312010z5138.80N/01656.77E_292/000t048r000p008h83b09921.open2300v1.10
+
+2019-11-15 16:00:11 - 2020-01-31 22:10:07
+APRS/CWOP weather 2020-01-31 22:10:07: show weather charts
+Temperature 8.9°C Humidity 83% Pressure 992.1 mbar
+Wind 292° 0.0 m/s
+Rain 0.0 mm/1h 2.0 mm/24h
+.open2300.10
+
+_292
+/000
+t048
+r000
+p008
+h83
+b09921
+.open2300v1.10
+
+==========================================================================
+2020-01-31 22:30:02 EET: SQ6NCC-13>APRS,TCPIP*,qAC,T2POLAND:!5108.21N/01647.50E_.../...g...t49h70WX Lutynia
+
+2018-02-20 17:15:00 - 2020-01-31 22:30:02
+APRS/CWOP weather 2020-01-31 22:30:02: show weather charts
+Temperature 9.4°C Humidity 70%
+WX Lutynia
+
+
+_...
+/...
+g...
+t49
+h70
+WX Lutynia
